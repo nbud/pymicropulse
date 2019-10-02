@@ -1,5 +1,6 @@
 import socket
 import numpy as np
+import pymicropulse as mp
 
 HOST = "10.1.1.2"
 PORT = 1067
@@ -13,6 +14,22 @@ print("Received", repr(data))
 arr = np.frombuffer(data, np.uint8)
 assert data[0] == 0x15
 assert arr[0] == 0x15
+
+#%% Temperature
+# see p 145
+
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    s.sendall(b"STS 20\r")
+    data = s.recv(1024)
+
+assert data[0] == mp.Header.UNIV
+assert data[1] == 0xF4
+
+temperatures = np.frombuffer(data[2:9:2], dtype=np.uint8)
+
+print(f"System {temperatures[0]}°C")
+print(f"Processor {temperatures[1]}°C")
 
 #%%
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -32,6 +49,5 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
 assert data[0] == 0x06
 
-import pymicropulse as mp
 
 print(mp.parse_error(data))
