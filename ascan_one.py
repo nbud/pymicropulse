@@ -47,7 +47,7 @@ _numaverages = int(np.log2(numaverages))
 pulser_width = 100
 
 # 25-200 V by 25 Volt
-pulser_voltage = 200
+pulser_voltage = 100
 
 # see p 121.
 # 0 to 7
@@ -116,8 +116,9 @@ ETM {test_idx} 0
     while len(data_plus_suffix) < (datacount + 2):
         data_plus_suffix += s.recv(4096)
     data = data_plus_suffix[:datacount]
+    # A CAL 0 ends with 0x01 0x01 (see p 45)
     suffix = data_plus_suffix[datacount:]
-    assert suffix[0] == suffix[1] == 1
+    assert suffix[0] == suffix[1] == mp.Header.CAL_ZERO_END
     if len(suffix) > 2:
         print(f"Unexpected trailing data: {suffix}")
     print("Ascan received")

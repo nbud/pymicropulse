@@ -5,6 +5,7 @@ Reference: command reference 2018
 """
 import enum
 import contextlib
+import socket
 
 
 class MicropulseError(Exception):
@@ -20,6 +21,7 @@ class Header(enum.IntEnum):
     ERROR = 0x6
     STA = 0x15
     ASCAN = 0x1A
+    CAL_ZERO_END = 0x01
 
 
 @enum.unique
@@ -89,7 +91,7 @@ def assert_no_error(sock, timeout=0.1):
     with set_timeout_and_rollback(sock, timeout):
         try:
             data = sock.recv(1024)
-        except BlockingIOError:
+        except socket.timeout:
             # no available data
             pass
         else:
