@@ -19,6 +19,7 @@ TIMEOUT = 5
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
+    mp.discard_reply(s)  # flush possible residual data
     s.sendall(b"RST 50\r")
     data = s.recv(1024)
     try:
