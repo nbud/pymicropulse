@@ -21,6 +21,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
     s.sendall(b"RST 50\r")
     data = s.recv(1024)
+    try:
+        raise mp.MicropulseError(mp.parse_error(data))
+    except mp.NotAnError:
+        pass
     sampling_rate = mp.parse_rst(data)["sampling_rate"]
     print(f"Sampling rate: {sampling_rate} MHz")
 
@@ -101,7 +105,7 @@ ETM {test_idx} 0
     header_length = 8
     data_header = s.recv(header_length)
     if data_header[0] != mp.Header.ASCAN:
-        raise mp.MicropulseError(mp.parse_error(data))
+        raise mp.MicropulseError(mp.parse_error(data_header))
     # Length of data in bytes (remove 8 bytes for already read header):
     datacount = (
         data_header[1]
@@ -119,25 +123,32 @@ ETM {test_idx} 0
 
 
 #%% Parse Ascan
-dof = data_header[6]
-if dof == 1:
-    dtype = np.uint8
-    bits_per_sample = 8
-elif dof in (2, 3, 4):
-    # 10, 12 or 16 bit output, padded with zeros on LSB if necessary
-    dtype = np.uint16
-    bits_per_sample = 16
-else:
-    raise ValueError("unsupported dof")
+def parse_ascan(data_header, data, return_as_float=True):
+    dof = data_header[6]
+    if dof == 1:
+        dtype = np.uint8
+        bits_per_sample = 8
+    elif dof in (2, 3, 4):
+        # 10, 12 or 16 bit output, padded with zeros on LSB if necessary
+        dtype = np.uint16
+        bits_per_sample = 16
+    else:
+        raise ValueError("unsupported dof")
 
-timetrace = np.frombuffer(data, dtype)
-# convert to ]-1, 1] float
-timetrace2 = timetrace.astype(np.float_) * 2 / 2 ** bits_per_sample - 1
+    timetrace = np.frombuffer(data, dtype)
+    if return_as_float:
+        # convert to ]-1, 1] float
+        return timetrace.astype(np.float_) * 2 / 2 ** bits_per_sample - 1
+    else:
+        return timetrace
 
+
+timetrace = parse_ascan(data_header, data)
 #%% Plot Ascan
 t = np.arange(gate_start, gate_end) / sampling_rate
 plt.figure()
-plt.step(t, timetrace2)
+# plt.step(t, timetrace)
+plt.plot(t, timetrace)
 plt.xlabel("time (µs)")
 plt.title(f"Ascan tx={tx_channel_idx} rx={rx_channel_idx}")
 plt.ylim([-1, 1])
