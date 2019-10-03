@@ -3,8 +3,6 @@ Acquire one Ascan with a Peakndt Micropulse ultrasound acquisition system and
 plot it
 
 Single channel transmitting, single channel receiving (possibly different)
-
-Known issue: CAL 1 returns a EHT supply error. CAL 0 works
 """
 import socket
 import numpy as np
@@ -77,8 +75,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.settimeout(TIMEOUT)
     cmd = f"""
 DOF {dof}
+NUM {test_idx}
 DLY {test_idx} 0
-NUM 1
 TXN {test_idx} {tx_channel_idx}
 RXN {test_idx} {rx_channel_idx}
 GAN {test_idx} {_gain_param}
@@ -99,8 +97,7 @@ ETM {test_idx} 0
     mp.assert_no_error(s)
 
     # Do acquisition
-    # mp.send_str_cmd(s, "CAL {test_idx}") # EHT supply error?
-    mp.send_str_cmd(s, "CAL 0")
+    mp.send_str_cmd(s, f"CAL {test_idx}")
     header_length = 8
     data_header = s.recv(header_length)
     if data_header[0] != mp.Header.ASCAN:
@@ -112,15 +109,12 @@ ETM {test_idx} 0
         + data_header[3] * 2 ** 16
         - header_length
     )
-    data_plus_suffix = b""
-    while len(data_plus_suffix) < (datacount + 2):
-        data_plus_suffix += s.recv(4096)
-    data = data_plus_suffix[:datacount]
-    # A CAL 0 ends with 0x01 0x01 (see p 45)
-    suffix = data_plus_suffix[datacount:]
-    assert suffix[0] == suffix[1] == mp.Header.CAL_ZERO_END
-    if len(suffix) > 2:
-        print(f"Unexpected trailing data: {suffix}")
+    all_data = b""
+    while len(all_data) < (datacount):
+        all_data += s.recv(4096)
+    data = all_data[:datacount]
+    if len(all_data) > len(data):
+        print(f"Unexpected trailing data: {all_data[datacount:]}")
     print("Ascan received")
 
 
@@ -145,4 +139,5 @@ t = np.arange(gate_start, gate_end) / sampling_rate
 plt.figure()
 plt.step(t, timetrace2)
 plt.xlabel("time (µs)")
-# plt.ylim([-1, 1])
+plt.title(f"Ascan tx={tx_channel_idx} rx={rx_channel_idx}")
+plt.ylim([-1, 1])
